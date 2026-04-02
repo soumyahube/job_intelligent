@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+
+  # -----------------------------------------------------------
+  # BASE DE DONNÉES
+  # -----------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: job_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # Docker attend que PostgreSQL soit vraiment prêt
+      # avant de lancer le service importer
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # -----------------------------------------------------------
+  # STOCKAGE FICHIERS (CVs)
+  # -----------------------------------------------------------
+  minio:
+    image: minio/minio
+    container_name: job_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+
+  # -----------------------------------------------------------
+  # IMPORT KAGGLE
+  # Se lance une seule fois, remplit la base, puis s'arrête
+  # -----------------------------------------------------------
+  importer:
+    build:
+      context: ./importer     # Dossier qui contient le Dockerfile
+    container_name: job_importer
+    environment:
+      POSTGRES_HOST: postgres  # Nom du service Docker, pas "localhost" !
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      # Le CSV Kaggle est monté depuis votre machine vers le container
+      - ./importer/data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy   # Attend que PostgreSQL soit prêt
+    restart: "no"                    # Ne se relance pas automatiquement
+
+volumes:
+  postgres_data:
+  minio_data:

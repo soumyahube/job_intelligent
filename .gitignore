@@ -1,0 +1,65 @@
+# Créer le fichier .gitignore
+@"
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*.ipynb
+!notebooks/*.ipynb  # Garder les notebooks
+
+# Docker
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Data files
+*.csv
+*.parquet
+*.json
+!zone_mapping.csv  # Garder le mapping
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Kafka logs
+/kafka-logs/
+
+# Cassandra data
+/cassandra-data/
+
+# MinIO data
+/minio-data/
+
+# Grafana data
+/grafana-data/
+"@ | Out-File -FilePath .gitignore -Encoding UTF8
