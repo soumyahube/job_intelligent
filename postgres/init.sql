@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS job_offers (
     titre           VARCHAR(255),
     entreprise      VARCHAR(255),
     localisation    VARCHAR(500),
-    description     TEXT,
+    description      TEXT,
 
     -- Salaire (le CSV a min/max séparément)
     salaire_min     FLOAT,

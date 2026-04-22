@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
 
@@ -18,15 +17,13 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      # Docker attend que PostgreSQL soit vraiment prêt
-      # avant de lancer le service importer
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   # -----------------------------------------------------------
-  # STOCKAGE FICHIERS (CVs)
+  # STOCKAGE FICHIERS (CVs + archives JSON)
   # -----------------------------------------------------------
   minio:
     image: minio/minio
@@ -38,29 +35,64 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9100:9000"
-      - "9101:9001"
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # -----------------------------------------------------------
-  # IMPORT KAGGLE
-  # Se lance une seule fois, remplit la base, puis s'arrête
+  # IMPORT KAGGLE — se lance une fois puis s'arrête
+  # Lancez manuellement avec :
+  # docker compose run --rm importer
   # -----------------------------------------------------------
   importer:
     build:
-      context: ./importer     # Dossier qui contient le Dockerfile
+      context: ./importer
     container_name: job_importer
     environment:
-      POSTGRES_HOST: postgres  # Nom du service Docker, pas "localhost" !
+      POSTGRES_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      # Le CSV Kaggle est monté depuis votre machine vers le container
       - ./importer/data:/app/data
     depends_on:
       postgres:
-        condition: service_healthy   # Attend que PostgreSQL soit prêt
-    restart: "no"                    # Ne se relance pas automatiquement
+        condition: service_healthy
+    profiles:
+      - tools          # Ne se lance PAS avec "docker compose up"
+    restart: "no"      # Lancez manuellement une seule fois
+
+  # -----------------------------------------------------------
+  # SCRAPER FRANCE TRAVAIL — se lance puis s'arrête
+  # Lancez manuellement avec :
+  # docker compose run --rm scraper
+  # -----------------------------------------------------------
+  scraper:
+    build:
+      context: ./scraper/franceTravail
+    container_name: job_scraper
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+      FT_CLIENT_ID: ${FT_CLIENT_ID}
+      FT_CLIENT_SECRET: ${FT_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    profiles:
+      - tools          # Ne se lance PAS avec "docker compose up"
+    restart: "no"
 
 volumes:
   postgres_data:
