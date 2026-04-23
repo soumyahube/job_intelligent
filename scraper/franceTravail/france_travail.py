@@ -46,7 +46,7 @@ def get_token():
         }
     )
 
-    if response.status_code in (200, 206):
+    if response.status_code not in (200, 206):
         print(f"   ERREUR token : {response.status_code} — {response.text}")
         return None
 
