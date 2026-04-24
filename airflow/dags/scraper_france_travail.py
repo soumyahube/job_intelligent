@@ -18,13 +18,15 @@ with DAG(
         container_name="job_scraper_airflow_run",
         auto_remove=True,
         docker_url="unix://var/run/docker.sock",
-        network_mode="host",                    # accès à postgres_app et minio
+        network_mode="job-intelligent_app_network",                    # accès à postgres_app et minio
+        force_pull=False,
+        mount_tmp_dir=False,  
         environment={
-            "POSTGRES_HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "POSTGRES_HOST": os.getenv("POSTGRES_HOST", "postgres_app"),
             "POSTGRES_USER": os.getenv("POSTGRES_USER"),
             "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
             "POSTGRES_DB": os.getenv("POSTGRES_DB"),
-            "MINIO_ENDPOINT": os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+            "MINIO_ENDPOINT": os.getenv("MINIO_ENDPOINT", "minio:9000"),
             "MINIO_ACCESS_KEY": os.getenv("MINIO_USER"),
             "MINIO_SECRET_KEY": os.getenv("MINIO_PASSWORD"),
             "FT_CLIENT_ID": os.getenv("FT_CLIENT_ID"),
