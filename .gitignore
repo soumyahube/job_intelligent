@@ -12,6 +12,9 @@ __pycache__/
 dist/
 build/
 
+airflow/logs/
+airflow/airflow.db
+
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb_checkpoints
