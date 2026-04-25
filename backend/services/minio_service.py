@@ -11,7 +11,6 @@ def get_minio_client():
 
 def init_bucket():
     client = get_minio_client()
-
     if not client.bucket_exists(MINIO_BUCKET):
         client.make_bucket(MINIO_BUCKET)
 
