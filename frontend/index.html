@@ -1,34 +1,223 @@
 <!DOCTYPE html>
-
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Job Intelligent - Upload CV</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Intelligent — Trouvez votre prochaine opportunité</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-```
-<div class="container">
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
 
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
 
-    <div class="card">
-        <h2>Importer votre CV</h2>
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">
+      <span class="logo-dot"></span>
+      Job Intelligent
+    </div>
+    <ul class="nav-links">
+      <li><a href="#search">Recherche</a></li>
+      <li><a href="#stats">Statistiques</a></li>
+      <li><a href="#features">Fonctionnalités</a></li>
+    </ul>
+    <button class="nav-cta">Commencer</button>
+  </nav>
 
-        <form id="uploadForm">
-            <input type="file" id="fileInput" accept=".pdf" required>
+  <!-- HERO -->
+  <section class="hero" id="search">
+    <div class="hero-badge">Propulsé par l'IA</div>
+    <h1 class="hero-title">
+      Trouvez l'offre<br>
+      <span class="line-accent">faite pour vous</span>
+    </h1>
+    <p class="hero-sub">
+      Importez votre CV ou décrivez votre profil en une phrase. Notre moteur IA analyse des milliers d'offres et vous propose les plus pertinentes.
+    </p>
 
-            <button type="submit">Charger CV</button>
+    <!-- CARD -->
+    <div class="main-card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('cv', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Importer mon CV
+        </button>
+        <button class="tab" onclick="switchTab('text', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Décrire mon profil
+        </button>
+      </div>
+
+      <!-- CV TAB -->
+      <div class="tab-content active" id="tab-cv">
+        <form id="uploadForm" class="upload-zone">
+          <input type="file" id="fileInput" accept=".pdf" onchange="handleFile(this)">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+          </div>
+          <div class="upload-title">Glissez votre CV ici</div>
+          <div class="upload-sub">ou <span>parcourir les fichiers</span> — PDF uniquement</div>
         </form>
 
+        <div class="file-selected" id="fileSelected">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="file-name" id="fileName">—</span>
+          <span class="file-size" id="fileSize"></span>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Analyser et trouver les offres
+        </button>
         <p id="status"></p>
+      </div>
+
+      <!-- TEXT TAB -->
+      <div class="tab-content" id="tab-text">
+        <label class="profile-label">Décrivez votre profil en quelques mots</label>
+        <textarea class="profile-textarea" id="profileText"
+          placeholder="Ex : Data Engineer avec 3 ans d'expérience en Python, Spark et Airflow, cherchant un poste en remote sur Paris ou Lyon..."
+          oninput="updateCount(this)" maxlength="500"></textarea>
+        <div class="char-count"><span id="charCount">0</span> / 500</div>
+
+        <div class="tags-row">
+          <span class="tag" onclick="addTag(this)">Data Engineer</span>
+          <span class="tag" onclick="addTag(this)">Data Scientist</span>
+          <span class="tag" onclick="addTag(this)">MLOps</span>
+          <span class="tag" onclick="addTag(this)">Machine Learning</span>
+          <span class="tag" onclick="addTag(this)">Remote</span>
+          <span class="tag" onclick="addTag(this)">Paris</span>
+        </div>
+
+        <button class="submit-btn" onclick="submitText()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Trouver mes offres
+        </button>
+        <p id="statusText"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="stats-section" id="stats">
+    <div class="section-label">Données en temps réel</div>
+    <h2 class="section-title">Le marché data<br>en chiffres</h2>
+    <p class="section-sub">Toutes les statistiques sont issues de notre base de données mise à jour quotidiennement via notre scraper France Travail.</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="countTotal">0</div>
+        <div class="stat-label">Offres indexées</div>
+        <div class="stat-delta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          +206 aujourd'hui
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">8</div>
+        <div class="stat-label">Métiers couverts</div>
+        <div class="stat-delta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          ML, Data, BI...
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">24h</div>
+        <div class="stat-label">Fréquence de mise à jour</div>
+        <div class="stat-delta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          Scraping automatique
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">2k+</div>
+        <div class="stat-label">Données historiques</div>
+        <div class="stat-delta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          Source Kaggle LinkedIn
+        </div>
+      </div>
     </div>
 
+    <a href="#" class="dashboard-btn" onclick="openDashboard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Voir le dashboard complet Power BI
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+    </a>
+  </section>
 
-</div>
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="section-label">Comment ça marche</div>
+    <h2 class="section-title">Votre profil.<br>Les meilleures offres.</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon icon-navy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div class="feature-title">Analyse de CV</div>
+        <div class="feature-desc">Notre IA extrait automatiquement vos compétences, votre expérience et vos préférences depuis votre CV PDF.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-lavender">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <div class="feature-title">Matching intelligent</div>
+        <div class="feature-desc">Un score de compatibilité est calculé pour chaque offre en comparant votre profil aux exigences des recruteurs.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon icon-rose">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="feature-title">Données fraîches</div>
+        <div class="feature-desc">Le scraper tourne chaque jour à minuit pour collecter les nouvelles offres France Travail automatiquement.</div>
+      </div>
+    </div>
+  </section>
 
-<script src="script.js"></script>
+  <!-- FOOTER -->
+  <footer>
+    <div>© 2026 <strong>Job Intelligent</strong> — Tous droits réservés</div>
+    <div>Données France Travail · Kaggle LinkedIn · Power BI</div>
+  </footer>
 
-
+  <script src="script.js?v=2"></script>
 </body>
 </html>

@@ -29,9 +29,8 @@ CREATE TABLE IF NOT EXISTS job_offers (
     type_contrat        VARCHAR(100),  -- "Full-time", "Part-time", "Contract"
     niveau_experience   VARCHAR(100),  -- "Entry level", "Mid-Senior", "Director"
     type_teletravail    VARCHAR(100),  -- "Remote", "On-site", "Hybrid"
+    url             TEXT UNIQUE,
 
-    -- Lien et source
-    url             TEXT,
     source          VARCHAR(50)   DEFAULT 'linkedin',
 
     -- Date (listed_time dans le CSV est un timestamp Unix → on convertit)

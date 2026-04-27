@@ -14,7 +14,7 @@ services:
       - postgres_app_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5434:5432"
+      - "5544:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -37,7 +37,7 @@ services:
     volumes:
       - postgres_airflow_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5545:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 5s
@@ -157,13 +157,13 @@ services:
       - app_network
 
 
-  ############################################################
-  # SCRAPER
+############################################################
+  # SCRAPER FRANCE TRAVAIL
   ############################################################
   scraper:
     build:
       context: ./scraper/franceTravail
-    image: scraper-francetravail:latest 
+    image: scraper-francetravail:latest
     container_name: job_scraper
     environment:
       POSTGRES_HOST: postgres_app
@@ -186,7 +186,86 @@ services:
     networks:
       - app_network
 
+  ############################################################
+  # SCRAPER REMOTIVE
+  ############################################################
+  scraper-remotive:
+    build:
+      context: ./scraper/remotive
+    image: scraper-remotive:latest
+    environment:
+      POSTGRES_HOST: postgres_app
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+    depends_on:
+      postgres_app:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    profiles:
+      - tools
+    restart: "no"
+    networks:
+      - app_network
 
+############################################################
+  # IMPORTER (manuel) — données Kaggle LinkedIn
+  ############################################################
+  importer:
+    build:
+      context: ./importer
+    container_name: job_importer
+    environment:
+      POSTGRES_HOST: postgres_app        # ← corrigé (pas "postgres")
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./importer/data:/app/data
+    depends_on:
+      postgres_app:                      # ← corrigé (pas "postgres")
+        condition: service_healthy
+    networks:
+      - app_network                      # ← ajout pour accès réseau
+    profiles:
+      - tools
+    restart: "no"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: job_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - app_network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: job_backend
+    environment:
+      MINIO_ENDPOINT:   minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+      MINIO_BUCKET:     cvs
+      POSTGRES_HOST:    postgres_app
+      POSTGRES_USER:    ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:      ${POSTGRES_DB}
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres_app:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - app_network
 ############################################################
 # VOLUMES
 ############################################################

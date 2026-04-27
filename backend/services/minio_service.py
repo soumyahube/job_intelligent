@@ -1,5 +1,6 @@
 from minio import Minio
 from config import *
+import io
 
 def get_minio_client():
     return Minio(
@@ -11,19 +12,47 @@ def get_minio_client():
 
 def init_bucket():
     client = get_minio_client()
+    
+    # Tester la connexion
+    try:
+        client.list_buckets()
+        print("✅ MinIO connection successful")
+    except Exception as e:
+        print(f"❌ MinIO connection failed: {e}")
+        raise
 
     if not client.bucket_exists(MINIO_BUCKET):
         client.make_bucket(MINIO_BUCKET)
+        print(f"✅ Bucket '{MINIO_BUCKET}' created")
+    else:
+        print(f"✅ Bucket '{MINIO_BUCKET}' already exists")
 
     return client
+
 def upload_to_minio(file):
     client = get_minio_client()
-
-    client.put_object(
+    file.seek(0)  # Important: retour au début du fichier
+    data = file.read()
+    file.seek(0)  # Reset pour une éventuelle réutilisation
+    
+    result = client.put_object(
         MINIO_BUCKET,
         file.filename,
-        file,
-        length=file.content_length or -1,
-        part_size=10 * 1024 * 1024
+        io.BytesIO(data),
+        length=len(data),
     )
-client = get_minio_client()
+    print(f"✅ File uploaded to MinIO: {file.filename}, etag: {result.etag}")
+    return result
+
+def get_file_from_minio(filename):
+    client = get_minio_client()
+    response = client.get_object(MINIO_BUCKET, filename)
+    data = response.read()
+    response.close()
+    response.release_conn()
+    return data
+
+def list_files():
+    client = get_minio_client()
+    objects = client.list_objects(MINIO_BUCKET, recursive=True)
+    return [obj.object_name for obj in objects]
