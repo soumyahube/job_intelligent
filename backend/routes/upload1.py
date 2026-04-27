@@ -1,8 +1,7 @@
-from flask import request, jsonify
-from services.minio_service import upload_to_minio
 from flask import Blueprint, request, jsonify
+from services.minio_service import upload_to_minio
 
-upload_bp = Blueprint("upload", __name__) 
+upload_bp = Blueprint("upload_bp", __name__)
 
 @upload_bp.route("/upload", methods=["POST"])
 def upload():
