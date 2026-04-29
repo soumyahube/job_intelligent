@@ -13,16 +13,12 @@ from urllib3.util.retry import Retry
 API_BASE = "https://remotive.com/api/remote-jobs"
 
 # Catégories ciblées
-CATEGORIES = [
-    "data",
-    "software-dev",
-    "devops",
-]
+CATEGORIES = ["data"]
 
 # Mots-clés data pour filtrer les offres software-dev et devops
 KEYWORDS_DATA = [
-    "data", "ml", "machine learning", "deep learning",
-    "mlops", "analytics", "bi ", "business intelligence",
+    "data engineer", "data engineering","data lake", "etl","ml", "machine learning", "deep learning",
+    "mlops", "analytics", "bi ", "business intelligence","pyspark", "spark", "airflow", "dbt", "warehouse", "pipeline",
     "spark", "airflow", "dbt", "warehouse", "pipeline",
     "python", "sql", "engineer", "scientist", "analyst"
 ]
@@ -43,10 +39,10 @@ def get_session():
 
 def est_offre_data(offre):
     """
-    Vérifie si une offre est liée au domaine data/ML.
+    Filtre strict sur le titre uniquement — Data Engineering uniquement.
     """
-    texte = f"{offre.get('title', '')} {offre.get('description', '')}".lower()
-    return any(kw in texte for kw in KEYWORDS_DATA)
+    titre = offre.get("title", "").lower()
+    return any(kw in titre for kw in KEYWORDS_DATA)
 
 
 def collecter_par_categorie(categorie):

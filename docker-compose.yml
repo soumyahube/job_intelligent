@@ -122,6 +122,8 @@ services:
       MINIO_PASSWORD: ${MINIO_PASSWORD}
       FT_CLIENT_ID: ${FT_CLIENT_ID}
       FT_CLIENT_SECRET: ${FT_CLIENT_SECRET}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
+      ADZUNA_API_KEY: ${ADZUNA_API_KEY}
     volumes:
         - ./airflow/dags:/opt/airflow/dags
         - ./airflow/logs:/opt/airflow/logs
@@ -201,6 +203,34 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+    depends_on:
+      postgres_app:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    profiles:
+      - tools
+    restart: "no"
+    networks:
+      - app_network
+
+############################################################
+  # SCRAPER ADZUNA  (à ajouter dans docker-compose.yml)
+  ############################################################
+  scraper-adzuna:
+    build:
+      context: ./scraper/adzuna
+    image: scraper-adzuna:latest
+    environment:
+      POSTGRES_HOST: postgres_app
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
+      ADZUNA_API_KEY: ${ADZUNA_API_KEY}
     depends_on:
       postgres_app:
         condition: service_healthy
