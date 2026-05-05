@@ -33,6 +33,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
 log = logging.getLogger(__name__)
 
@@ -472,4 +473,9 @@ Les 3 pipelines s'exécutent en parallèle, puis `verifier_totaux` valide les co
         t_adz_l = PythonOperator(task_id="adzuna_load",      python_callable=adzuna_load)
         t_adz_e >> t_adz_t >> t_adz_l
 
-    debut >> [tg_ft, tg_remotive, tg_adzuna] >> verification
+    trigger_silver_gold = TriggerDagRunOperator(
+      task_id="trigger_silver_to_gold",
+      trigger_dag_id="silver_to_gold_nlp",
+      wait_for_completion=False,
+    )
+    debut >> [tg_ft, tg_remotive, tg_adzuna] >> verification >> trigger_silver_gold

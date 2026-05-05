@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.sensors.external_task import ExternalTaskSensor
 
 log = logging.getLogger(__name__)
 
@@ -577,7 +578,7 @@ with DAG(
     dag_id="silver_to_gold_nlp",
     description="Silver→Gold : NLP compétences → dim_competence + job_competences + embeddings",
     start_date=datetime(2024, 1, 1),
-    schedule_interval="0 8 * * *",   # 2h après le DAG ETL (qui tourne à 6h)
+    schedule_interval=None,   # 2h après le DAG ETL (qui tourne à 6h)
     catchup=False,
     default_args=DEFAULT_ARGS,
     tags=["gold", "nlp", "competences", "embeddings"],
@@ -604,7 +605,14 @@ job_market.job_embeddings    ← vecteurs pour le matching IA
 ) as dag:
 
     debut = EmptyOperator(task_id="debut")
-
+    wait_for_etl = ExternalTaskSensor(
+      task_id="wait_for_etl_pipeline",
+      external_dag_id="etl_job_offers_pipeline_v3",
+      external_task_id="verifier_totaux",
+      mode="reschedule",
+      timeout=3600,
+      poke_interval=120,
+    )
     t_dim_date = PythonOperator(
         task_id="remplir_dim_date",
         python_callable=remplir_dim_date,
