@@ -57,21 +57,40 @@ PATHS = {
 BUCKET_RAW       = "raw-scrapes"
 BUCKET_PROCESSED = "processed-scrapes"
 
+SOURCE_URLS = {
+    "france_travail": "https://api.francetravail.io",
+    "remotive":       "https://remotive.com/api/remote-jobs",
+    "adzuna":         "https://api.adzuna.com",
+    "linkedin":       "https://www.linkedin.com/jobs",
+}
+ 
+CONTRAT_CATEGORIES = {
+    "Full-time":  "permanent",
+    "Part-time":  "permanent",
+    "Contract":   "temporaire",
+    "Freelance":  "freelance",
+    "Internship": "stage",
+    "CDI":        "permanent",
+    "CDD":        "temporaire",
+    "MIS":        "temporaire",
+}
+ 
 INSERT_QUERY = """
-    INSERT INTO job_offers (
+    INSERT INTO job_market.job_offers (
         titre, entreprise, localisation, description,
         salaire_min, salaire_max, devise,
         competences_texte, type_contrat, niveau_experience,
-        url, source, date_publication
+        url, source, source_id, contrat_id, localisation_id,
+        date_publication
     ) VALUES (
         %(titre)s, %(entreprise)s, %(localisation)s, %(description)s,
         %(salaire_min)s, %(salaire_max)s, %(devise)s,
         %(competences_texte)s, %(type_contrat)s, %(niveau_experience)s,
-        %(url)s, %(source)s, %(date_publication)s
+        %(url)s, %(source)s, %(source_id)s, %(contrat_id)s, %(localisation_id)s,
+        %(date_publication)s
     )
     ON CONFLICT (url) DO NOTHING
 """
-
 
 # ─────────────────────────────────────────────
 # HELPERS
@@ -132,19 +151,94 @@ def make_key(source: str, run_id: str, stage: str) -> str:
 
 
 def pg_load(offres: list, source: str):
-    """Insère les offres dans PostgreSQL et logue le total."""
+    """
+    Insère les offres dans job_market.job_offers.
+    Remplit automatiquement dim_source, dim_contrat, dim_localisation.
+    """
     conn   = psycopg2.connect(**get_db_config())
     cursor = conn.cursor()
-    execute_batch(cursor, INSERT_QUERY, offres, page_size=100)
+ 
+    # 1. Upsert source une seule fois pour tout le batch
+    source_id = _upsert_source(cursor, source)
     conn.commit()
-    cursor.execute("SELECT COUNT(*) FROM job_offers WHERE source = %s", (source,))
+ 
+    # 2. Enrichir chaque offre avec les IDs des dimensions
+    offres_enrichies = []
+    for offre in offres:
+        contrat_id      = _upsert_contrat(cursor,      offre.get("type_contrat"))
+        localisation_id = _upsert_localisation(cursor, offre.get("localisation"))
+        offres_enrichies.append({
+            **offre,
+            "source_id":       source_id,
+            "contrat_id":      contrat_id,
+            "localisation_id": localisation_id,
+        })
+ 
+    conn.commit()
+ 
+    # 3. Insertion en batch
+    execute_batch(cursor, INSERT_QUERY, offres_enrichies, page_size=100)
+    conn.commit()
+ 
+    # 4. Stats
+    cursor.execute(
+        "SELECT COUNT(*) FROM job_market.job_offers WHERE source = %s", (source,)
+    )
     total_source = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM job_offers")
+    cursor.execute("SELECT COUNT(*) FROM job_market.job_offers")
     total_global = cursor.fetchone()[0]
+ 
     cursor.close()
     conn.close()
-    log.info(f"{source} : {len(offres)} insérées | en base : {total_source} | total : {total_global}")
+ 
+    log.info(
+        f"{source} : {len(offres)} insérées | "
+        f"en base : {total_source} | total : {total_global}"
+    )
+ 
 
+ 
+def _upsert_source(cursor, source: str) -> int:
+    url_base = SOURCE_URLS.get(source, "")
+    cursor.execute("""
+        INSERT INTO job_market.dim_source (nom, url_base)
+        VALUES (%s, %s)
+        ON CONFLICT (nom) DO NOTHING
+    """, (source, url_base))
+    cursor.execute("SELECT id FROM job_market.dim_source WHERE nom = %s", (source,))
+    return cursor.fetchone()[0]
+ 
+ 
+def _upsert_contrat(cursor, type_contrat: str):
+    if not type_contrat:
+        return None
+    categorie = CONTRAT_CATEGORIES.get(type_contrat, "autre")
+    cursor.execute("""
+        INSERT INTO job_market.dim_contrat (type_contrat, categorie)
+        VALUES (%s, %s)
+        ON CONFLICT (type_contrat) DO NOTHING
+    """, (type_contrat, categorie))
+    cursor.execute(
+        "SELECT id FROM job_market.dim_contrat WHERE type_contrat = %s", (type_contrat,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None
+ 
+ 
+def _upsert_localisation(cursor, localisation: str):
+    if not localisation:
+        return None
+    is_remote = "remote" in localisation.lower() or "télétravail" in localisation.lower()
+    cursor.execute("""
+        INSERT INTO job_market.dim_localisation (ville, is_remote)
+        VALUES (%s, %s)
+        ON CONFLICT (ville, pays) DO NOTHING
+    """, (localisation, is_remote))
+    cursor.execute(
+        "SELECT id FROM job_market.dim_localisation WHERE ville = %s", (localisation,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None
 
 # ═══════════════════════════════════════════════════════════
 # FRANCE TRAVAIL — Extract / Transform / Load
@@ -291,21 +385,35 @@ def adzuna_load(**context):
 # ═══════════════════════════════════════════════════════════
 
 def verifier_totaux(**context):
-    """Résumé des comptages en base après le pipeline complet."""
+    """Résumé des comptages après le pipeline ETL complet."""
     conn   = psycopg2.connect(**get_db_config())
     cursor = conn.cursor()
+ 
     log.info("=" * 50)
     log.info("RÉSUMÉ DU PIPELINE ETL")
     log.info("=" * 50)
+ 
     for source in ["france_travail", "remotive", "adzuna"]:
-        cursor.execute("SELECT COUNT(*) FROM job_offers WHERE source = %s", (source,))
+        cursor.execute(
+            "SELECT COUNT(*) FROM job_market.job_offers WHERE source = %s", (source,)
+        )
         log.info(f"  {source:<20} : {cursor.fetchone()[0]:>6} offres")
-    cursor.execute("SELECT COUNT(*) FROM job_offers")
+ 
+    cursor.execute("SELECT COUNT(*) FROM job_market.job_offers")
     log.info(f"  {'TOTAL':<20} : {cursor.fetchone()[0]:>6} offres")
+ 
+    # Vérification rapide des dimensions remplies
+    cursor.execute("SELECT COUNT(*) FROM job_market.dim_source")
+    log.info(f"  dim_source       : {cursor.fetchone()[0]} entrées")
+    cursor.execute("SELECT COUNT(*) FROM job_market.dim_contrat")
+    log.info(f"  dim_contrat      : {cursor.fetchone()[0]} entrées")
+    cursor.execute("SELECT COUNT(*) FROM job_market.dim_localisation")
+    log.info(f"  dim_localisation : {cursor.fetchone()[0]} entrées")
+ 
     log.info("=" * 50)
+ 
     cursor.close()
     conn.close()
-
 
 # ─────────────────────────────────────────────
 # DÉFINITION DU DAG

@@ -7,7 +7,7 @@ Orchestre la collecte, le prétraitement et la sauvegarde.
 
 from remotive import collecter_toutes_les_offres
 from preprocess import pretraiter_offres
-from save_to_db import sauvegarder_brut_dans_minio, inserer_dans_postgres
+from scraper.remotive.save_to_db_v0 import sauvegarder_brut_dans_minio, inserer_dans_postgres
 
 print("=" * 50)
 print("SCRAPER REMOTIVE")
