@@ -131,6 +131,4 @@ curl http://localhost:8000/api/jobs?location=Casablanca
 -   Ajouter tests unitaires & CI/CD
 -   Intégrer Redis pour le caching
 
-## Licence
 
-Open-source --- à définir.
