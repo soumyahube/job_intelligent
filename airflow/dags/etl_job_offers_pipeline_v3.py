@@ -82,13 +82,15 @@ INSERT_QUERY = """
         salaire_min, salaire_max, devise,
         competences_texte, type_contrat, niveau_experience,
         url, source, source_id, contrat_id, localisation_id,
-        date_publication
+        date_publication,
+        is_remote
     ) VALUES (
         %(titre)s, %(entreprise)s, %(localisation)s, %(description)s,
         %(salaire_min)s, %(salaire_max)s, %(devise)s,
         %(competences_texte)s, %(type_contrat)s, %(niveau_experience)s,
         %(url)s, %(source)s, %(source_id)s, %(contrat_id)s, %(localisation_id)s,
-        %(date_publication)s
+        %(date_publication)s,
+        %(is_remote)s
     )
     ON CONFLICT (url) DO NOTHING
 """
@@ -152,50 +154,45 @@ def make_key(source: str, run_id: str, stage: str) -> str:
 
 
 def pg_load(offres: list, source: str):
-    """
-    Insère les offres dans job_market.job_offers.
-    Remplit automatiquement dim_source, dim_contrat, dim_localisation.
-    """
     conn   = psycopg2.connect(**get_db_config())
     cursor = conn.cursor()
- 
-    # 1. Upsert source une seule fois pour tout le batch
+
+    # 1. source
     source_id = _upsert_source(cursor, source)
     conn.commit()
- 
-    # 2. Enrichir chaque offre avec les IDs des dimensions
+
     offres_enrichies = []
+
     for offre in offres:
-        contrat_id      = _upsert_contrat(cursor,      offre.get("type_contrat"))
+
+        contrat_id      = _upsert_contrat(cursor, offre.get("type_contrat"))
         localisation_id = _upsert_localisation(cursor, offre.get("localisation"))
+
+        loc = (offre.get("localisation") or "").lower()
+
+        # ✅ LOGIQUE CORRECTE REMOTE
+        is_remote = (
+            "remote" in loc
+            or "télétravail" in loc
+            or source == "remotive"
+            or loc in ["worldwide", "anywhere", "global"]
+        )
+
         offres_enrichies.append({
             **offre,
-            "source_id":       source_id,
-            "contrat_id":      contrat_id,
+            "source_id": source_id,
+            "contrat_id": contrat_id,
             "localisation_id": localisation_id,
+            "is_remote": is_remote
         })
- 
+
     conn.commit()
- 
-    # 3. Insertion en batch
+
     execute_batch(cursor, INSERT_QUERY, offres_enrichies, page_size=100)
     conn.commit()
- 
-    # 4. Stats
-    cursor.execute(
-        "SELECT COUNT(*) FROM job_market.job_offers WHERE source = %s", (source,)
-    )
-    total_source = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM job_market.job_offers")
-    total_global = cursor.fetchone()[0]
- 
+
     cursor.close()
     conn.close()
- 
-    log.info(
-        f"{source} : {len(offres)} insérées | "
-        f"en base : {total_source} | total : {total_global}"
-    )
  
 
  
@@ -229,14 +226,16 @@ def _upsert_contrat(cursor, type_contrat: str):
 def _upsert_localisation(cursor, localisation: str):
     if not localisation:
         return None
-    is_remote = "remote" in localisation.lower() or "télétravail" in localisation.lower()
+
     cursor.execute("""
-        INSERT INTO job_market.dim_localisation (ville, is_remote)
+        INSERT INTO job_market.dim_localisation (ville, pays)
         VALUES (%s, %s)
         ON CONFLICT (ville, pays) DO NOTHING
-    """, (localisation, is_remote))
+    """, (localisation, "France"))
+
     cursor.execute(
-        "SELECT id FROM job_market.dim_localisation WHERE ville = %s", (localisation,)
+        "SELECT id FROM job_market.dim_localisation WHERE ville = %s",
+        (localisation,)
     )
     row = cursor.fetchone()
     return row[0] if row else None
