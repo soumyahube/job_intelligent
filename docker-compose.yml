@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
 
   ############################################################
@@ -14,7 +16,7 @@ services:
       - postgres_app_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5544:5432"
+      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -23,9 +25,8 @@ services:
     networks:
       - app_network
 
-
   ############################################################
-  # POSTGRES — BASE AIRFLOW
+  # POSTGRES — AIRFLOW
   ############################################################
   postgres_airflow:
     image: postgres:16
@@ -37,7 +38,7 @@ services:
     volumes:
       - postgres_airflow_data:/var/lib/postgresql/data
     ports:
-      - "5545:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 5s
@@ -46,12 +47,12 @@ services:
     networks:
       - app_network
 
-
   ############################################################
   # AIRFLOW INIT
   ############################################################
   airflow-init:
-    image: airflow-custom:latest
+    build:
+      context: ./airflow
     container_name: airflow_init
     depends_on:
       postgres_airflow:
@@ -71,12 +72,12 @@ services:
     networks:
       - app_network
 
-
   ############################################################
   # AIRFLOW WEBSERVER
   ############################################################
   airflow-webserver:
-    image: airflow-custom:latest
+    build:
+      context: ./airflow
     container_name: airflow_webserver
     depends_on:
       airflow-init:
@@ -86,6 +87,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID}      
+      ADZUNA_API_KEY: ${ADZUNA_API_KEY} 
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -93,17 +96,17 @@ services:
       - ./scraper:/app/scraper
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8081:8080"
+      - "8083:8080"
     command: webserver
     networks:
       - app_network
-
 
   ############################################################
   # AIRFLOW SCHEDULER
   ############################################################
   airflow-scheduler:
-    image: airflow-custom:latest
+    build:
+      context: ./airflow
     container_name: airflow_scheduler
     depends_on:
       airflow-init:
@@ -112,7 +115,6 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-      # ← AJOUT de toutes les variables nécessaires
       POSTGRES_HOST: postgres_app
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -122,18 +124,16 @@ services:
       MINIO_PASSWORD: ${MINIO_PASSWORD}
       FT_CLIENT_ID: ${FT_CLIENT_ID}
       FT_CLIENT_SECRET: ${FT_CLIENT_SECRET}
-      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
-      ADZUNA_API_KEY: ${ADZUNA_API_KEY}
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID}        # ← ajouter
+      ADZUNA_API_KEY: ${ADZUNA_API_KEY} 
     volumes:
-        - ./airflow/dags:/opt/airflow/dags
-        - ./airflow/logs:/opt/airflow/logs
-        - ./scraper:/app/scraper
-        - /var/run/docker.sock:/var/run/docker.sock
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./scraper:/app/scraper
+      - /var/run/docker.sock:/var/run/docker.sock
     command: scheduler
     networks:
       - app_network
-
-
 
   ############################################################
   # MINIO
@@ -158,9 +158,8 @@ services:
     networks:
       - app_network
 
-
-############################################################
-  # SCRAPER FRANCE TRAVAIL
+  ############################################################
+  # SCRAPER
   ############################################################
   scraper:
     build:
@@ -189,82 +188,21 @@ services:
       - app_network
 
   ############################################################
-  # SCRAPER REMOTIVE
+  # DBEAVER
   ############################################################
-  scraper-remotive:
-    build:
-      context: ./scraper/remotive
-    image: scraper-remotive:latest
-    environment:
-      POSTGRES_HOST: postgres_app
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_USER}
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
-    depends_on:
-      postgres_app:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    profiles:
-      - tools
-    restart: "no"
-    networks:
-      - app_network
-
-############################################################
-  # SCRAPER ADZUNA  (à ajouter dans docker-compose.yml)
-  ############################################################
-  scraper-adzuna:
-    build:
-      context: ./scraper/adzuna
-    image: scraper-adzuna:latest
-    environment:
-      POSTGRES_HOST: postgres_app
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_USER}
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD}
-      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
-      ADZUNA_API_KEY: ${ADZUNA_API_KEY}
-    depends_on:
-      postgres_app:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    profiles:
-      - tools
-    restart: "no"
-    networks:
-      - app_network
-
-############################################################
-  # IMPORTER (manuel) — données Kaggle LinkedIn
-  ############################################################
-  importer:
-    build:
-      context: ./importer
-    container_name: job_importer
-    environment:
-      POSTGRES_HOST: postgres_app        # ← corrigé (pas "postgres")
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+  dbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: job_dbeaver
+    ports:
+      - "8082:8978"
     volumes:
-      - ./importer/data:/app/data
-    depends_on:
-      postgres_app:                      # ← corrigé (pas "postgres")
-        condition: service_healthy
+      - dbeaver_data:/opt/cloudbeaver/workspace
     networks:
-      - app_network                      # ← ajout pour accès réseau
-    profiles:
-      - tools
-    restart: "no"
+      - app_network
 
+  ############################################################
+  # FRONTEND
+  ############################################################
   frontend:
     build:
       context: ./frontend
@@ -274,19 +212,22 @@ services:
     networks:
       - app_network
 
+  ############################################################
+  # BACKEND
+  ############################################################
   backend:
     build:
       context: ./backend
     container_name: job_backend
     environment:
-      MINIO_ENDPOINT:   minio:9000
+      MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASSWORD}
-      MINIO_BUCKET:     cvs
-      POSTGRES_HOST:    postgres_app
-      POSTGRES_USER:    ${POSTGRES_USER}
+      MINIO_BUCKET: cvs
+      POSTGRES_HOST: postgres_app
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB:      ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5000:5000"
     depends_on:
@@ -296,6 +237,7 @@ services:
         condition: service_healthy
     networks:
       - app_network
+
 ############################################################
 # VOLUMES
 ############################################################
@@ -303,6 +245,7 @@ volumes:
   postgres_app_data:
   postgres_airflow_data:
   minio_data:
+  dbeaver_data:
 
 ############################################################
 # NETWORKS
