@@ -89,12 +89,17 @@ services:
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID}      
       ADZUNA_API_KEY: ${ADZUNA_API_KEY} 
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      AIRFLOW__API__ENABLE_EXPERIMENTAL_API: "True"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/config:/opt/airflow/config
       - ./scraper:/app/scraper
       - /var/run/docker.sock:/var/run/docker.sock
+      - huggingface_cache:/root/.cache/huggingface   # ← ajouter cette ligne
+
     ports:
       - "8083:8080"
     command: webserver
@@ -131,6 +136,8 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - ./scraper:/app/scraper
       - /var/run/docker.sock:/var/run/docker.sock
+      - huggingface_cache:/root/.cache/huggingface   # ← ajouter cette ligne
+
     command: scheduler
     networks:
       - app_network
@@ -246,6 +253,7 @@ volumes:
   postgres_airflow_data:
   minio_data:
   dbeaver_data:
+  huggingface_cache:   # ← ajouter cette ligne
 
 ############################################################
 # NETWORKS

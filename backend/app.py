@@ -1,5 +1,6 @@
 from flask import Flask
 from routes.upload import upload_bp
+from routes.recommend import recommend_bp          # ← LIGNE 1 : importer
 from services.minio_service import init_bucket
 from flask_cors import CORS
 
@@ -8,6 +9,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Register routes
 app.register_blueprint(upload_bp)
+app.register_blueprint(recommend_bp)              # ← LIGNE 2 : enregistrer
 
 # Health check
 @app.route("/")
